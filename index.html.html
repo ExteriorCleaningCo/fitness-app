@@ -167,23 +167,231 @@ function wInput(p,kg){if(imp()){let st='',lb='';if(kg){const t=kg*2.20462;st=Mat
 function readW(p){if(imp()){const st=parseFloat($(p+'St').value)||0,lb=parseFloat($(p+'Lb').value)||0;const t=st*14+lb;return t>0?t/2.20462:NaN}return parseFloat($(p+'Kg').value)}
 
 /* ================= COMMON FOODS (per 100g/ml, approx) ================= */
+// [name, kcal, protein, carbs, fat, fibre, serving size, unit, serving name, extra search words] – per 100g / 100ml, typical UK values
 const COMMON_RAW=[
-['Chicken breast, raw',106,24,0,1.1,0,150,'g'],['Chicken breast, cooked',165,31,0,3.6,0,150,'g'],['Turkey breast, cooked',135,30,0,1.5,0,120,'g'],
-['Beef mince 5% fat, raw',125,21.5,0,4.5,0,125,'g'],['Beef mince 20% fat, raw',254,17,0,20,0,125,'g'],['Steak, sirloin, grilled',190,29,0,8,0,200,'g'],
-['Salmon fillet, raw',208,20,0,13,0,120,'g'],['Cod fillet, raw',82,18,0,0.7,0,140,'g'],['Tuna, tinned in water (drained)',116,26,0,1,0,110,'g'],['Prawns, cooked',99,24,0.2,0.3,0,100,'g'],
-['Egg, whole (large)',143,12.6,0.7,9.5,0,58,'g'],['Egg whites',52,11,0.7,0.2,0,100,'g'],['Bacon medallions, grilled',150,26,0.5,5,0,40,'g'],
-['Greek yoghurt 0% fat',57,10,3.6,0.4,0,170,'g'],['Cottage cheese',98,11,3.4,4.3,0,150,'g'],['Cheddar cheese',403,25,0.1,33,0,30,'g'],
-['Semi-skimmed milk',46,3.4,4.7,1.7,0,200,'ml'],['Skimmed milk',34,3.4,5,0.1,0,200,'ml'],['Whey protein powder',400,78,8,6,0,30,'g'],
-['Porridge oats',375,11,60,8,9,40,'g'],['White rice, cooked',130,2.7,28,0.3,0.4,180,'g'],['Rice, uncooked',360,7,79,0.6,1,75,'g'],
-['Pasta, uncooked',355,12.5,71,1.5,3,75,'g'],['Pasta, cooked',158,5.8,31,0.9,1.8,180,'g'],['Potatoes, boiled',75,1.8,17,0.1,1.5,200,'g'],
-['Sweet potato, baked',90,2,21,0.2,3.3,150,'g'],['Wholemeal bread',247,13,41,3.4,7,40,'g'],['White bread',265,9,49,3.2,2.7,40,'g'],
-['Tortilla wrap',310,8.5,52,7,3,62,'g'],['Rice cakes',387,8,81,2.8,3,9,'g'],['Baked beans',78,4.7,12.9,0.2,3.7,200,'g'],
-['Banana',89,1.1,23,0.3,2.6,120,'g'],['Apple',52,0.3,14,0.2,2.4,150,'g'],['Blueberries',57,0.7,14,0.3,2.4,80,'g'],['Strawberries',32,0.7,7.7,0.3,2,80,'g'],
-['Broccoli',34,2.8,7,0.4,2.6,80,'g'],['Mixed salad leaves',17,1.3,3,0.2,1.3,50,'g'],['Avocado',160,2,8.5,14.7,6.7,70,'g'],
-['Peanut butter',588,25,20,50,6,15,'g'],['Almonds',579,21,22,50,12,25,'g'],['Olive oil',884,0,0,100,0,10,'ml'],['Butter',717,0.9,0.1,81,0,10,'g'],
-['Protein bar (typical)',350,33,33,11,5,60,'g'],['Lager / beer (4%)',43,0.4,3.5,0,0,568,'ml'],['Red wine',85,0.1,2.6,0,0,175,'ml'],['Semi-skimmed latte',48,3.2,4.8,1.7,0,300,'ml']
+// Hot drinks
+['Coffee, black (americano / filter)',2,0.1,0.3,0,0,250,'ml','mug','instant'],
+['White coffee (semi-skimmed milk)',7,0.5,0.6,0.2,0,250,'ml','mug','milky instant americano'],
+['White coffee (whole milk)',9,0.5,0.6,0.5,0,250,'ml','mug','milky instant'],
+['White coffee with 1 sugar (semi-skimmed)',13,0.5,2.2,0.2,0,250,'ml','mug','sugar sweet instant'],
+['Coffee with oat milk',9,0.2,1,0.3,0.1,250,'ml','mug','oatly instant white'],
+['Latte (semi-skimmed)',48,3.2,4.8,1.7,0,350,'ml','regular cup','coffee shop costa starbucks'],
+['Latte (oat milk)',45,0.6,6,2,0.5,350,'ml','regular cup','coffee shop costa starbucks'],
+['Cappuccino (semi-skimmed)',38,2.6,3.8,1.4,0,300,'ml','regular cup','coffee shop costa'],
+['Flat white (semi-skimmed)',50,3.4,5,1.8,0,220,'ml','cup','coffee shop costa'],
+['Espresso',2,0.1,0,0.2,0,30,'ml','shot','coffee'],
+['Tea with semi-skimmed milk',7,0.4,0.6,0.2,0,250,'ml','mug','brew cuppa builders'],
+['Tea with milk and 1 sugar',13,0.4,2.2,0.2,0,250,'ml','mug','brew cuppa sweet'],
+['Tea, black / green / herbal',1,0,0.2,0,0,250,'ml','mug','brew'],
+['Hot chocolate (made with milk)',80,3.5,11,2.5,0.5,250,'ml','mug','cocoa'],
+['Sugar',400,0,100,0,0,4,'g','teaspoon','granulated sweetener'],
+['Honey',329,0.4,82,0,0,7,'g','teaspoon',''],
+// Cold drinks
+['Orange juice',45,0.7,10,0.1,0.2,150,'ml','glass','oj fruit'],
+['Apple juice',46,0.1,11,0.1,0,150,'ml','glass','fruit'],
+['Coca-Cola / cola (full sugar)',42,0,10.6,0,0,330,'ml','can','coke pepsi fizzy pop soft drink'],
+['Diet / zero cola',0.4,0,0,0,0,330,'ml','can','coke pepsi max fizzy pop sugar free'],
+['Energy drink (full sugar)',47,0,11,0,0,500,'ml','can','monster red bull'],
+['Energy drink (sugar free)',3,0,0.5,0,0,500,'ml','can','monster red bull zero'],
+['Squash, no added sugar (diluted)',2,0,0.2,0,0,250,'ml','glass','robinsons cordial'],
+['Whole milk',64,3.4,4.7,3.6,0,200,'ml','glass',''],
+['Semi-skimmed milk',46,3.4,4.7,1.7,0,200,'ml','glass',''],
+['Skimmed milk',34,3.4,5,0.1,0,200,'ml','glass',''],
+['Oat milk',46,1,6.7,1.5,0.8,200,'ml','glass','oatly'],
+['Almond milk, unsweetened',13,0.4,0,1.1,0.3,200,'ml','glass','alpro'],
+['Protein shake (whey with water)',400,78,8,6,0,30,'g','scoop','powder'],
+// Alcohol
+['Lager / beer (4%)',43,0.4,3.5,0,0,568,'ml','pint','carling fosters'],
+['Strong lager (5%)',48,0.4,3.5,0,0,568,'ml','pint','stella peroni madri beer'],
+['Bitter / ale',32,0.3,2.2,0,0,568,'ml','pint','beer'],
+['Guinness / stout',35,0.3,3,0,0,568,'ml','pint','beer'],
+['Cider',47,0,4.3,0,0,568,'ml','pint','strongbow'],
+['Red wine',85,0.1,2.6,0,0,175,'ml','medium glass',''],
+['White wine',82,0.1,2.6,0,0,175,'ml','medium glass',''],
+['Prosecco',70,0,1.5,0,0,125,'ml','glass','fizz champagne'],
+['Spirits (gin / vodka / whisky / rum)',222,0,0,0,0,25,'ml','single','shot'],
+['Tonic water, slimline',1,0,0.2,0,0,150,'ml','mixer','diet'],
+// Bread & bakery
+['Sourdough bread',250,9,48,1.5,2.5,50,'g','slice','toast'],
+['White bread',235,8,46,1.9,2.7,40,'g','slice','toast warburtons hovis kingsmill'],
+['Wholemeal bread',220,10,37,2.5,7,40,'g','slice','brown toast hovis'],
+['Seeded / granary bread',265,10,42,5,6,44,'g','slice','toast brown'],
+['Bread roll, white',265,9,49,3,2.5,60,'g','roll','bap barm cob bun'],
+['Bagel, plain',260,10,50,1.5,2.5,85,'g','bagel',''],
+['Crumpet',190,6,38,0.9,2,55,'g','crumpet',''],
+['English muffin',230,9,44,2,2.5,60,'g','muffin',''],
+['Croissant',410,8,45,21,2.5,60,'g','croissant','pastry'],
+['Pain au chocolat',420,7,46,23,2.5,60,'g','pastry',''],
+['Pitta bread',255,9,52,1.2,2.5,60,'g','pitta',''],
+['Naan bread',290,8,48,7,2,130,'g','naan',''],
+['Tortilla wrap',310,8.5,52,7,3,62,'g','wrap',''],
+['Brioche bun',340,9,50,11,2,50,'g','bun','burger'],
+['Rice cakes',387,8,81,2.8,3,9,'g','cake',''],
+// Cereals
+['Porridge oats (dry)',375,11,60,8,9,40,'g','portion','oatmeal quaker'],
+['Porridge made with semi-skimmed milk',100,4.5,13,3,1.3,250,'g','bowl','oats oatmeal'],
+['Weetabix',362,12,69,2,10,37.5,'g','2 biscuits','cereal'],
+['Cornflakes',378,7,84,0.9,3,30,'g','bowl','cereal kelloggs'],
+['Bran flakes',350,10,65,2.5,15,30,'g','bowl','cereal'],
+['Granola',450,9,62,17,6,45,'g','bowl','cereal'],
+['Muesli',360,9,64,6,8,45,'g','bowl','alpen cereal'],
+// Eggs, breakfast
+['Egg, boiled or poached',143,12.6,0.7,9.5,0,58,'g','large egg','eggs'],
+['Egg, fried',180,13.6,0.7,14,0,60,'g','egg','eggs'],
+['Scrambled egg (with milk & butter)',160,11,1.5,12,0,120,'g','2-egg portion','eggs'],
+['Egg whites',52,11,0.7,0.2,0,100,'g','portion',''],
+['Back bacon, grilled',287,23,0.1,21,0,25,'g','rasher','bacon'],
+['Bacon medallions, grilled',150,26,0.5,5,0,20,'g','medallion','bacon'],
+['Pork sausage, grilled',280,14,10,20,1,45,'g','sausage','banger'],
+['Black pudding',255,9,19,16,0.5,30,'g','slice',''],
+['Hash brown',190,2.5,23,10,2,45,'g','hash brown',''],
+['Baked beans',78,4.7,12.9,0.2,3.7,200,'g','half tin','heinz'],
+['Mushrooms, fried',150,2.4,0.4,16,1.5,50,'g','portion',''],
+// Spreads & sauces
+['Butter',717,0.9,0.1,81,0,10,'g','thin spread','lurpak'],
+['Light spread / margarine',350,0,0,38,0,10,'g','thin spread','flora clover'],
+['Jam',260,0.4,64,0,0.5,15,'g','tablespoon','marmalade'],
+['Marmite',260,39,24,0.5,3,4,'g','teaspoon',''],
+['Chocolate spread (Nutella)',539,6.3,57.5,31,3.4,15,'g','tablespoon',''],
+['Peanut butter',588,25,20,50,6,15,'g','tablespoon',''],
+['Mayonnaise',690,1,1.5,76,0,15,'g','tablespoon','mayo hellmanns'],
+['Light mayonnaise',270,1,7,26,0,15,'g','tablespoon','mayo'],
+['Tomato ketchup',100,1.2,23,0.1,0.8,15,'g','tablespoon','sauce heinz'],
+['Brown sauce',100,1,23,0.1,1,15,'g','tablespoon','hp'],
+['Gravy (made up)',35,0.6,5,1.5,0.2,60,'ml','portion','bisto'],
+['Pesto',450,5,6,45,1,15,'g','tablespoon',''],
+['Hummus',290,7,10,24,6,30,'g','2 tablespoons','houmous'],
+// Dairy
+['Cheddar cheese',403,25,0.1,33,0,30,'g','matchbox piece','cheese'],
+['Light cheddar',314,27,0.1,22,0,30,'g','piece','cheese'],
+['Mozzarella',250,18,2,19,0,30,'g','portion','cheese'],
+['Halloumi',320,21,2,25,0,50,'g','2 slices','cheese'],
+['Feta',265,14,1.5,22,0,30,'g','portion','cheese'],
+['Cream cheese, light',155,7.5,5,11,0,30,'g','portion','philadelphia'],
+['Cottage cheese',98,11,3.4,4.3,0,150,'g','portion',''],
+['Greek yoghurt 0% fat',57,10,3.6,0.4,0,170,'g','pot','fage yogurt'],
+['Greek-style yoghurt (full fat)',133,5.7,4.8,10,0,150,'g','portion','yogurt'],
+['Skyr / high-protein yoghurt',63,11,4,0.2,0,150,'g','pot','yogurt arla'],
+['Fruit yoghurt, low fat',80,4.5,13,1,0,125,'g','pot','yogurt muller'],
+['Double cream',450,1.7,2.6,48,0,15,'ml','tablespoon',''],
+['Single cream',190,2.6,4,18,0,15,'ml','tablespoon',''],
+// Meat & fish
+['Chicken breast, raw',106,24,0,1.1,0,150,'g','breast',''],
+['Chicken breast, cooked',165,31,0,3.6,0,150,'g','breast',''],
+['Chicken thigh, cooked (skinless)',180,25,0,9,0,90,'g','thigh',''],
+['Chicken nuggets',260,15,17,15,1,120,'g','6 nuggets',''],
+['Turkey breast, cooked',135,30,0,1.5,0,120,'g','portion',''],
+['Ham, sliced',110,19,1.5,3,0,25,'g','slice',''],
+['Beef mince 5% fat, raw',125,21.5,0,4.5,0,125,'g','portion','lean'],
+['Beef mince 20% fat, raw',254,17,0,20,0,125,'g','portion',''],
+['Steak, sirloin, grilled',190,29,0,8,0,200,'g','steak','beef'],
+['Roast beef',170,29,0,6,0,90,'g','3 slices','sunday dinner'],
+['Roast chicken (with skin)',220,25,0,13,0,120,'g','portion','sunday dinner'],
+['Roast lamb',260,26,0,17,0,90,'g','portion','sunday dinner'],
+['Pork chop, grilled',220,30,0,11,0,150,'g','chop',''],
+['Beef burger, grilled',250,17,3,19,0,113,'g','quarter pounder','patty'],
+['Salmon fillet, raw',208,20,0,13,0,120,'g','fillet','fish'],
+['Smoked salmon',180,23,0,10,0,50,'g','portion','fish'],
+['Cod fillet, raw',82,18,0,0.7,0,140,'g','fillet','fish'],
+['Battered cod (chippy)',230,15,12,13,0.5,200,'g','fillet','fish and chips'],
+['Fish fingers',220,13,19,10,1,28,'g','finger','fish birds eye'],
+['Tuna, tinned in water (drained)',116,26,0,1,0,110,'g','small tin','fish'],
+['Mackerel, smoked',350,19,0,30,0,80,'g','fillet','fish'],
+['Prawns, cooked',99,24,0.2,0.3,0,100,'g','portion','shrimp'],
+['Quorn mince',105,14,4.5,2,6,75,'g','portion','vegetarian'],
+['Tofu',120,13,1,7,1,100,'g','portion','vegan'],
+// Potatoes, rice, pasta
+['Potatoes, boiled',75,1.8,17,0.1,1.5,200,'g','portion','new'],
+['Jacket potato (baked)',93,2.5,21,0.1,2.2,220,'g','medium','baked'],
+['Mashed potato (with milk & butter)',105,1.8,15,4.3,1.3,180,'g','portion','mash'],
+['Roast potatoes',150,2.9,25,4.5,2,150,'g','portion','roasties sunday dinner'],
+['Chips, oven',160,3,26,4.5,2.5,150,'g','portion','fries mccain'],
+['Chips, chip shop',239,3.2,30.5,12.4,2.2,200,'g','portion','fries chippy fish and'],
+['Fries, fast food',296,3.4,38,14,3.6,114,'g','medium','chips mcdonalds'],
+['Sweet potato, baked',90,2,21,0.2,3.3,150,'g','medium',''],
+['White rice, cooked',130,2.7,28,0.3,0.4,180,'g','portion','basmati'],
+['Brown rice, cooked',123,2.7,26,1,1.8,180,'g','portion',''],
+['Rice, uncooked',360,7,79,0.6,1,75,'g','portion','dry basmati'],
+['Microwave rice pouch',150,3.2,30,2,1,250,'g','pouch','uncle bens tilda'],
+['Pilau rice',160,3,28,4,0.5,250,'g','takeaway portion','indian curry'],
+['Egg fried rice',180,4.5,27,6,1,300,'g','takeaway portion','chinese'],
+['Pasta, uncooked',355,12.5,71,1.5,3,75,'g','portion','spaghetti penne fusilli'],
+['Pasta, cooked',158,5.8,31,0.9,1.8,180,'g','portion','spaghetti penne fusilli'],
+['Egg noodles, cooked',138,4.5,25,2,1,185,'g','portion',''],
+['Couscous, cooked',112,3.8,23,0.2,1.4,150,'g','portion',''],
+['Yorkshire pudding',230,8,26,10,1,25,'g','pudding','sunday dinner'],
+// Veg
+['Broccoli',34,2.8,7,0.4,2.6,80,'g','portion','veg vegetables'],
+['Carrots',35,0.6,7.9,0.3,2.6,80,'g','portion','veg'],
+['Peas',80,5.5,10,1.5,5,80,'g','portion','veg garden'],
+['Sweetcorn',80,2.9,15,1.2,2.8,80,'g','portion','veg corn'],
+['Green beans',25,1.8,3.5,0.3,3,80,'g','portion','veg'],
+['Spinach',23,2.9,1.4,0.4,2.2,80,'g','portion','veg'],
+['Mixed frozen veg',50,3,7,0.5,3,80,'g','portion','vegetables'],
+['Cauliflower',25,1.9,3,0.3,2,80,'g','portion','veg'],
+['Mixed salad leaves',17,1.3,3,0.2,1.3,50,'g','bowl','lettuce'],
+['Tomato',18,0.9,3.9,0.2,1.2,85,'g','tomato','salad'],
+['Cucumber',12,0.6,2,0.1,0.5,60,'g','portion','salad'],
+['Pepper',30,1,5,0.3,1.8,80,'g','half pepper','veg'],
+['Onion',40,1.1,9,0.1,1.7,80,'g','medium','veg'],
+['Mushrooms',22,3.1,0.5,0.3,1,80,'g','portion','veg'],
+['Avocado',160,2,8.5,14.7,6.7,70,'g','half',''],
+['Chopped tomatoes, tinned',22,1.1,3.8,0.1,1,200,'g','half tin',''],
+['Kidney beans (drained)',100,7,13,0.6,6,120,'g','half tin',''],
+['Chickpeas (drained)',115,7,14,2.9,5,120,'g','half tin',''],
+['Lentils, cooked',116,9,20,0.4,8,120,'g','portion',''],
+// Fruit
+['Banana',89,1.1,23,0.3,2.6,120,'g','medium','fruit'],
+['Apple',52,0.3,14,0.2,2.4,150,'g','medium','fruit'],
+['Orange',47,0.9,12,0.1,2.4,140,'g','medium','fruit satsuma clementine'],
+['Pear',57,0.4,15,0.1,3.1,170,'g','medium','fruit'],
+['Grapes',69,0.7,18,0.2,0.9,80,'g','handful','fruit'],
+['Blueberries',57,0.7,14,0.3,2.4,80,'g','handful','fruit'],
+['Strawberries',32,0.7,7.7,0.3,2,80,'g','handful','fruit'],
+['Raspberries',52,1.2,12,0.7,6.5,80,'g','handful','fruit'],
+['Pineapple',50,0.5,13,0.1,1.4,80,'g','portion','fruit'],
+['Melon',34,0.8,8,0.2,0.9,150,'g','slice','fruit'],
+['Mango',60,0.8,15,0.4,1.6,80,'g','portion','fruit'],
+['Raisins',299,3,79,0.5,3.7,30,'g','small box','fruit dried'],
+// Snacks & treats
+['Crisps (ready salted)',530,6,53,32,4.5,25,'g','bag','walkers'],
+['Almonds',579,21,22,50,12,25,'g','handful','nuts'],
+['Mixed nuts',607,20,10,54,6,25,'g','handful','nuts cashews peanuts'],
+['Peanuts, salted',600,25,10,50,6,25,'g','handful','nuts'],
+['Beef jerky',250,40,15,3,1,25,'g','bag','biltong'],
+['Protein bar (typical)',350,33,33,11,5,60,'g','bar','grenade fulfil'],
+['Cereal bar',400,6,65,13,4,30,'g','bar','nature valley'],
+['Milk chocolate',535,7.7,57,30,2,45,'g','bar','cadbury dairy milk'],
+['Dark chocolate (70%)',600,7.8,46,43,11,20,'g','2 squares',''],
+['KitKat (4 finger)',518,6.6,60,27,2,41.5,'g','bar','chocolate'],
+['Digestive biscuit',480,7,63,21,3.5,15,'g','biscuit','mcvities'],
+['Chocolate digestive',495,6.7,62,24,3,17,'g','biscuit','mcvities'],
+['Rich tea biscuit',450,7,72,15,2.5,8,'g','biscuit',''],
+['Victoria sponge cake',360,5,52,15,1,60,'g','slice','cake'],
+['Blueberry muffin',380,5,48,18,1.5,110,'g','muffin','cake'],
+['Ice cream, vanilla',200,3.5,24,10,0,60,'g','scoop',''],
+['Sausage roll',330,8,27,21,1.5,100,'g','roll','greggs pastry'],
+// Meals & takeaways
+['Spaghetti bolognese',120,7,13,4,1.5,400,'g','portion','pasta'],
+['Chilli con carne (no rice)',110,9,7,5,2.5,300,'g','portion',''],
+['Lasagne',150,8,12,8,1,400,'g','portion','pasta'],
+['Cottage / shepherd\'s pie',105,6,9,5,1,400,'g','portion',''],
+['Chicken tikka masala',140,10,5,9,1,350,'g','portion','curry indian takeaway'],
+['Chicken korma',180,10,6,13,1,350,'g','portion','curry indian takeaway'],
+['Sweet & sour chicken',160,9,20,5,1,350,'g','portion','chinese takeaway'],
+['Pizza, takeaway (margherita)',260,11,32,9,2,100,'g','slice','dominos'],
+['Pizza, takeaway (pepperoni)',280,12,30,12,2,100,'g','slice','dominos'],
+['Cheeseburger (fast food)',250,13,28,10,1.5,120,'g','burger','mcdonalds'],
+['Doner kebab (meat & pitta)',260,14,20,14,1.5,350,'g','kebab','takeaway'],
+['Chicken salad sandwich (shop)',190,11,22,6,2.5,190,'g','pack','meal deal'],
+['Tomato soup (tinned)',52,0.9,6,2.6,0.6,300,'g','half tin','heinz'],
+['Vegetable soup',40,1.3,6,1.2,1.3,300,'g','bowl',''],
+// Cooking
+['Olive oil',884,0,0,100,0,10,'ml','tablespoon',''],
+['Vegetable / sunflower oil',884,0,0,100,0,10,'ml','tablespoon','rapeseed'],
+['Spray oil (1 cal)',500,0,0,55,0,0.2,'ml','spray','frylight']
 ];
-const COMMON={};COMMON_RAW.forEach((a,i)=>{const id='g_'+i;COMMON[id]={id,name:a[0],brand:'Generic',per100:{kcal:a[1],p:a[2],c:a[3],f:a[4],fib:a[5]},servingG:a[6],unit:a[7],generic:true}});
+const COMMON={};COMMON_RAW.forEach((a,i)=>{const id='g_'+i;COMMON[id]={id,name:a[0],brand:'Generic',per100:{kcal:a[1],p:a[2],c:a[3],f:a[4],fib:a[5]},servingG:a[6],unit:a[7],servingName:a[8]||'',tags:a[9]||'',generic:true}});
 const TEMP={};
 function getFood(id){return S.foods[id]||COMMON[id]||TEMP[id]||null}
 
@@ -334,7 +542,7 @@ function copyMeal(m){const src=peekDay(keyAdd(viewDate,-1)).meals[m]||[];day(vie
 /* ---- add food sheet ---- */
 let addCtx={meal:'breakfast',date:null,tab:'recent',q:'',online:null,mode:'log',loading:false};
 function openAdd(meal,mode){addCtx.meal=meal||addCtx.meal||defaultMeal();addCtx.date=tab==='food'?viewDate:todayKey();addCtx.mode=mode||'log';addCtx.q='';addCtx.online=null;if(!['recent','favs','mine','meals','common'].includes(addCtx.tab))addCtx.tab='recent';renderAdd()}
-function foodRow(f,extra){const n=f.per100||{};return`<div class="frow-wrap"><button class="frow" onclick="pickFood('${f.id}')"><div>${f.recipe?'🥘 ':''}${esc(f.name)}</div><div class="fs">${f.brand?esc(f.brand)+' · ':''}${r0(n.kcal)} kcal · ${fm(n.p||0)}g P per 100${f.unit||'g'}${f.servingG?` · serving ${r0(f.servingG)}${f.unit||'g'}`:''}</div></button>${extra||''}</div>`}
+function foodRow(f,extra){const n=f.per100||{};return`<div class="frow-wrap"><button class="frow" onclick="pickFood('${f.id}')"><div>${f.recipe?'🥘 ':''}${esc(f.name)}</div><div class="fs">${f.brand?esc(f.brand)+' · ':''}${r0(n.kcal)} kcal · ${fm(n.p||0)}g P per 100${f.unit||'g'}${f.servingG?` · 1 ${esc(f.servingName||'serving')} = ${fm(f.servingG)}${f.unit||'g'}`:''}</div></button>${extra||''}</div>`}
 function listFor(tabName){
   const mine=Object.values(S.foods);
   if(tabName==='recent')return S.recent.map(getFood).filter(Boolean);
@@ -342,13 +550,30 @@ function listFor(tabName){
   if(tabName==='mine')return mine.filter(f=>!f.recipe).sort((a,b)=>a.name.localeCompare(b.name));
   if(tabName==='meals')return mine.filter(f=>f.recipe).sort((a,b)=>a.name.localeCompare(b.name));
   return Object.values(COMMON)}
+/* ---- forgiving search: typos, plurals, any word order ---- */
+function norm(t){return String(t||'').toLowerCase().replace(/[’']/g,'').replace(/[^a-z0-9%]+/g,' ').trim()}
+function stem(w){return w.length>4&&/ies$/.test(w)?w.slice(0,-3)+'y':w.length>3&&/(s|es)$/.test(w)&&!/ss$/.test(w)?w.replace(/e?s$/,''):w}
+function lev(a,b){if(Math.abs(a.length-b.length)>2)return 9;let prev=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const cur=[i];for(let j=1;j<=b.length;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));prev=cur}return prev[b.length]}
+function wordScore(q,w){if(w===q)return 3;if(w.startsWith(q))return 2.5;const qs=stem(q),ws=stem(w);if(qs===ws)return 3;if(ws.startsWith(qs)&&qs.length>=3)return 2;
+  if(q.length>=5){const pre=w.slice(0,q.length);const tol=q.length>=7?2:1;if(lev(q,pre)<=tol||lev(q,w)<=tol)return 1.5}
+  if(q.length>=4&&w.includes(q))return 1;return 0}
+function searchFoods(query,pool){const qw=norm(query).split(' ').filter(Boolean);if(!qw.length)return[];const out=[];
+  for(const f of pool){const nameW=norm(f.name).split(' '),extraW=norm((f.brand&&f.brand!=='Generic'?f.brand:'')+' '+(f.tags||'')+' '+(f.servingName||'')).split(' ').filter(Boolean);let total=0,ok=true;
+    for(const q of qw){let best=0;for(const w of nameW)best=Math.max(best,wordScore(q,w));for(const w of extraW)best=Math.max(best,wordScore(q,w)*0.8);if(!best){ok=false;break}total+=best}
+    if(!ok)continue;const nn=norm(f.name);if(nn.startsWith(norm(query)))total+=2;if(!f.generic)total+=0.6;total-=nameW.length*0.05;out.push([total,f])}
+  return out.sort((a,b)=>b[0]-a[0]).map(x=>x[1])}
+let searchTimer=null,searchSeq=0;
+function onSearchInput(v){addCtx.q=v;addCtx.online=null;addCtx.loading=false;addCtx.err=null;$('addTabs').style.display=v.trim()?'none':'flex';$('addRes').innerHTML=addResultsHtml();
+  clearTimeout(searchTimer);if(v.trim().length>=3)searchTimer=setTimeout(onlineSearch,650)}
 function addResultsHtml(){
   const q=addCtx.q.trim().toLowerCase();let html='';
-  if(q){const pool=[...Object.values(S.foods),...Object.values(COMMON)];const loc=pool.filter(f=>(f.name+' '+(f.brand||'')).toLowerCase().includes(q)).slice(0,12);
-    html+=loc.length?`<h4>Your foods & common foods</h4>`+loc.map(f=>foodRow(f)).join(''):'';
-    if(addCtx.loading)html+=`<p class="muted">Searching UK products…</p>`;
-    else if(addCtx.online){html+=`<h4>From Open Food Facts</h4>`+(addCtx.online.length?addCtx.online.map(f=>foodRow(f)).join(''):'<p class="small muted">No matches online – try fewer words, or create the food yourself.</p>')}
-    else html+=`<button class="btn block" onclick="onlineSearch()">🔎 Search supermarket products for “${esc(addCtx.q.trim())}”</button>`;
+  if(q){const loc=searchFoods(addCtx.q,[...Object.values(S.foods),...Object.values(COMMON)]).slice(0,15);
+    html+=`<h4>Everyday foods${Object.keys(S.foods).length?' & your foods':''}</h4>`+(loc.length?loc.map(f=>foodRow(f)).join(''):'<p class="small muted">No everyday match – check the shop products below.</p>');
+    html+=`<h4>Shop products (Open Food Facts)</h4>`;
+    if(addCtx.loading)html+=`<p class="small muted">Searching UK products…</p>`;
+    else if(addCtx.online)html+=addCtx.online.length?addCtx.online.map(f=>foodRow(f)).join(''):`<p class="small muted">${addCtx.err?esc(addCtx.err):'No shop products found – try a brand name, e.g. “Warburtons sourdough”.'}</p>`;
+    else html+=q.length<3?'<p class="small muted">Keep typing to search shop products…</p>':`<button class="btn block" onclick="onlineSearch()">🔎 Search shop products</button>`;
+    html+=`<button class="btn ghost block mt" onclick='openCreateFood({name:${JSON.stringify(addCtx.q.trim()).replace(/'/g,"&#39;")}})'>+ Can't find it? Create “${esc(addCtx.q.trim())}”</button>`;
     return html}
   const l=listFor(addCtx.tab);
   const ed=f=>addCtx.tab==='meals'?`<button class="iconbtn" onclick="editRecipe('${f.id}')" aria-label="Edit">✎</button>`:addCtx.tab==='mine'?`<button class="iconbtn" onclick="openCreateFood({edit:'${f.id}'})" aria-label="Edit">✎</button>`:'';
@@ -360,16 +585,22 @@ function renderAdd(){
   openSheet(sheetHead(title,addCtx.mode==='recipe'?'openRecipe()':'')+`
   ${addCtx.mode==='log'?`<div class="chips" style="margin-bottom:10px">${MEALS.map(([m,n])=>`<button class="chip ${addCtx.meal===m?'on':''}" onclick="addCtx.meal='${m}';renderAdd()">${n}</button>`).join('')}</div>`:''}
   <div class="row" style="margin-bottom:10px"><button class="btn pri" style="flex:1" onclick="openScanner(addCtx.mode,true)">📷 Scan barcode</button>${addCtx.mode==='log'?`<button class="btn" style="flex:1" onclick="openQuick()">⚡ Quick add</button>`:''}</div>
-  <form onsubmit="event.preventDefault();onlineSearch()" class="inrow"><input id="addQ" placeholder="Search e.g. chicken, Warburtons, Fage" value="${esc(addCtx.q)}" oninput="addCtx.q=this.value;addCtx.online=null;$('addRes').innerHTML=addResultsHtml();$('addTabs').style.display=this.value.trim()?'none':'flex'" autocomplete="off"><button class="btn" style="flex:none">Search</button></form>
+  <form onsubmit="event.preventDefault();clearTimeout(searchTimer);onlineSearch();this.querySelector('input').blur()" class="inrow"><input id="addQ" type="search" enterkeyhint="search" placeholder="Search e.g. white coffee, sourdough, Fage" value="${esc(addCtx.q)}" oninput="onSearchInput(this.value)" autocomplete="off" autocorrect="off"><button class="btn" style="flex:none">Search</button></form>
   <div class="chips mt" id="addTabs" style="display:${addCtx.q.trim()?'none':'flex'}">${tabs.map(([k,n])=>`<button class="chip ${addCtx.tab===k?'on':''}" onclick="addCtx.tab='${k}';renderAdd()">${n}</button>`).join('')}</div>
   <div id="addRes" class="mt">${addResultsHtml()}</div>
   <hr><div class="row"><button class="btn sm ghost" onclick="openCreateFood({})">+ Create a food</button>${addCtx.mode==='log'?`<button class="btn sm ghost" onclick="newRecipe()">+ Build a meal</button>`:''}</div>`)}
+async function fetchJSON(url,ms){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
 async function onlineSearch(){
-  const q=addCtx.q.trim();if(!q)return;addCtx.loading=true;$('addRes').innerHTML=addResultsHtml();$('addTabs').style.display='none';
-  try{const url=`https://uk.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=15&fields=code,product_name,product_name_en,brands,nutriments,serving_quantity,quantity`;
-    const r=await fetch(url);const j=await r.json();
-    addCtx.online=(j.products||[]).map(parseOFF).filter(f=>f&&f.per100.kcal>0).slice(0,10);addCtx.online.forEach(f=>TEMP[f.id]=f)}
-  catch(e){addCtx.online=[];toast('Online search failed – check signal')}
+  const q=addCtx.q.trim();if(q.length<2)return;const seq=++searchSeq;addCtx.loading=true;addCtx.err=null;if($('addRes'))$('addRes').innerHTML=addResultsHtml();
+  const F='code,product_name,product_name_en,brands,nutriments,serving_quantity,quantity';let prods=null,failed=0;
+  const tries=[
+    ()=>fetchJSON(`https://search.openfoodfacts.org/search?q=${encodeURIComponent(q+' countries_tags:"en:united-kingdom"')}&page_size=25&fields=${F}`,7000).then(j=>j.hits),
+    ()=>fetchJSON(`https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&page_size=25&fields=${F}`,7000).then(j=>j.hits),
+    ()=>fetchJSON(`https://uk.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=${F}`,12000).then(j=>j.products)];
+  for(const t of tries){try{const r=await t();if(Array.isArray(r)&&r.length){prods=r;break}if(Array.isArray(r))prods=prods||[]}catch(e){failed++}if(seq!==searchSeq)return}
+  if(seq!==searchSeq)return;
+  const seen=new Set();addCtx.online=(prods||[]).map(parseOFF).filter(f=>f&&f.per100.kcal>0&&f.name!=='Unnamed product'&&!seen.has(f.id)&&seen.add(f.id)).slice(0,12);addCtx.online.forEach(f=>TEMP[f.id]=f);
+  if(!prods&&failed)addCtx.err='Shop search unavailable right now (no signal, or the food database is busy). Everyday foods above still work.';
   addCtx.loading=false;if($('addRes'))$('addRes').innerHTML=addResultsHtml()}
 function parseOFF(p){
   if(!p)return null;const n=p.nutriments||{};const g=k=>{const v=n[k+'_100g'];return v==null||v===''?null:parseFloat(v)};
@@ -389,12 +620,12 @@ function openQty(fid,opts){
 function qtyPreview(){const n=qtyCtx.food.per100,k=(qtyCtx.g||0)/100;return`<div class="grid2"><div class="stat"><div class="v">${r0(n.kcal*k)}</div><div class="l">kcal</div></div><div class="stat"><div class="v">${fm((n.p||0)*k)}g</div><div class="l">Protein</div></div><div class="stat"><div class="v">${fm((n.c||0)*k)}g</div><div class="l">Carbs</div></div><div class="stat"><div class="v">${fm((n.f||0)*k)}g</div><div class="l">Fat</div></div></div>`}
 function renderQty(){
   const f=qtyCtx.food,u=f.unit||'g',sg=f.servingG,fav=S.favs.includes(qtyCtx.fid);
-  const chips=[...(sg?[[sg/2,'½ serving'],[sg,'1 serving'],[sg*2,'2 servings']]:[]),[50,'50'+u],[100,'100'+u],[150,'150'+u],[200,'200'+u],[250,'250'+u]];
+  const sn=f.servingName||'serving';const chips=[...(sg?[[sg/2,'½ '+sn],[sg,'1 '+sn],[sg*2,'2 × '+sn]]:[]),[50,'50'+u],[100,'100'+u],[150,'150'+u],[200,'200'+u],[250,'250'+u]];
   const back=qtyCtx.edit?'':qtyCtx.mode==='recipe'?'openAdd(null,\'recipe\')':'renderAdd()';
   openSheet(sheetHead(qtyCtx.edit?'Edit entry':'How much?',back)+`
   <div class="between"><div><b style="font-size:17px">${f.recipe?'🥘 ':''}${esc(f.name)}</b><div class="small muted">${f.brand?esc(f.brand)+' · ':''}${r0(f.per100.kcal)} kcal · ${fm(f.per100.p||0)}g P per 100${u}</div>${f.complete===false?'<div class="xs warn">Calories missing on this product – check the label</div>':''}</div>${qtyCtx.fid?`<button class="iconbtn" onclick="toggleFav()" aria-label="Favourite" style="color:${fav?'var(--warn)':'var(--mute)'}">${fav?'★':'☆'}</button>`:''}</div>
   <div class="inrow mt"><div><label class="f">Amount (${u})</label><input id="qG" type="number" inputmode="decimal" value="${r1(qtyCtx.g)}" oninput="qtyCtx.g=parseFloat(this.value)||0;syncQty('g')"></div>
-  ${sg?`<div><label class="f">Servings (${r0(sg)}${u} each)</label><input id="qS" type="number" inputmode="decimal" step="0.25" value="${r1(qtyCtx.g/sg)}" oninput="qtyCtx.g=(parseFloat(this.value)||0)*${sg};syncQty('s')"></div>`:''}</div>
+  ${sg?`<div><label class="f">How many (1 ${esc(f.servingName||'serving')} = ${fm(sg)}${u})</label><input id="qS" type="number" inputmode="decimal" step="0.25" value="${r1(qtyCtx.g/sg)}" oninput="qtyCtx.g=(parseFloat(this.value)||0)*${sg};syncQty('s')"></div>`:''}</div>
   <div class="chips mt">${chips.map(([g,l])=>`<button class="chip" onclick="qtyCtx.g=${g};syncQty()">${l}</button>`).join('')}</div>
   <div id="qPrev" class="mt">${qtyPreview()}</div>
   ${qtyCtx.mode==='log'?`<label class="f">Meal</label><div class="chips">${MEALS.map(([m,n])=>`<button class="chip ${qtyCtx.meal===m?'on':''}" onclick="qtyCtx.meal='${m}';this.parentNode.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')">${n}</button>`).join('')}</div>`:''}
