@@ -551,7 +551,7 @@ function listFor(tabName){
   if(tabName==='meals')return mine.filter(f=>f.recipe).sort((a,b)=>a.name.localeCompare(b.name));
   return Object.values(COMMON)}
 /* ---- forgiving search: typos, plurals, any word order ---- */
-function norm(t){return String(t||'').toLowerCase().replace(/[’']/g,'').replace(/[^a-z0-9%]+/g,' ').trim()}
+function norm(t){return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’']/g,'').replace(/[^a-z0-9%]+/g,' ').trim()}
 function stem(w){return w.length>4&&/ies$/.test(w)?w.slice(0,-3)+'y':w.length>3&&/(s|es)$/.test(w)&&!/ss$/.test(w)?w.replace(/e?s$/,''):w}
 function lev(a,b){if(Math.abs(a.length-b.length)>2)return 9;let prev=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const cur=[i];for(let j=1;j<=b.length;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));prev=cur}return prev[b.length]}
 function wordScore(q,w){if(w===q)return 3;if(w.startsWith(q))return 2.5;const qs=stem(q),ws=stem(w);if(qs===ws)return 3;if(ws.startsWith(qs)&&qs.length>=3)return 2;
@@ -590,26 +590,49 @@ function renderAdd(){
   <div id="addRes" class="mt">${addResultsHtml()}</div>
   <hr><div class="row"><button class="btn sm ghost" onclick="openCreateFood({})">+ Create a food</button>${addCtx.mode==='log'?`<button class="btn sm ghost" onclick="newRecipe()">+ Build a meal</button>`:''}</div>`)}
 async function fetchJSON(url,ms){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
+const offCache={};
+function brandStr(b){return(Array.isArray(b)?b.join(','):String(b||'')).split(',')[0].trim()}
+function offRank(q,list){
+  const qw=norm(q).split(' ').filter(Boolean);const need=qw.length<=2?qw.length:qw.length-1;const seen=new Set(),out=[];
+  for(const f of list){if(!f)continue;const n=f.per100;if(!(n.kcal>0)||n.kcal>900||f.name==='Unnamed product')continue;
+    const est=4*(n.p||0)+4*(n.c||0)+9*(n.f||0)+2*(n.fib||0);if(est>30&&Math.abs(n.kcal-est)/est>0.45)continue;
+    const nameW=norm(f.name).split(' '),brW=norm(f.brand).split(' ').filter(Boolean);let hit=0,score=0;
+    for(const w of qw){let b=0;for(const x of nameW)b=Math.max(b,wordScore(w,x));for(const x of brW)b=Math.max(b,wordScore(w,x)*0.9);if(b){hit++;score+=b}}
+    if(hit<need)continue;
+    const key=norm(f.name)+'|'+norm(f.brand)+'|'+Math.round(n.kcal/5);if(seen.has(key))continue;seen.add(key);
+    score+=f.uk?2:0;score+=(f.filled||0)*0.15;score+=hit===qw.length?2:0;score-=nameW.length*0.04;out.push([score,f])}
+  if(out.length>=4){const ks=out.map(x=>x[1].per100.kcal).sort((a,b)=>a-b);const med=ks[Math.floor(ks.length/2)];out.forEach(x=>{const k=x[1].per100.kcal;if(k<med/3||k>med*3)x[0]-=6})}
+  return out.sort((a,b)=>b[0]-a[0]).map(x=>x[1])}
 async function onlineSearch(){
-  const q=addCtx.q.trim();if(q.length<2)return;const seq=++searchSeq;addCtx.loading=true;addCtx.err=null;if($('addRes'))$('addRes').innerHTML=addResultsHtml();
-  const F='code,product_name,product_name_en,brands,nutriments,serving_quantity,quantity';let prods=null,failed=0;
-  const tries=[
-    ()=>fetchJSON(`https://search.openfoodfacts.org/search?q=${encodeURIComponent(q+' countries_tags:"en:united-kingdom"')}&page_size=25&fields=${F}`,7000).then(j=>j.hits),
-    ()=>fetchJSON(`https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&page_size=25&fields=${F}`,7000).then(j=>j.hits),
-    ()=>fetchJSON(`https://uk.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=${F}`,12000).then(j=>j.products)];
-  for(const t of tries){try{const r=await t();if(Array.isArray(r)&&r.length){prods=r;break}if(Array.isArray(r))prods=prods||[]}catch(e){failed++}if(seq!==searchSeq)return}
+  const q=addCtx.q.trim();if(q.length<2)return;const seq=++searchSeq;const ck=norm(q);
+  if(offCache[ck]){addCtx.online=offCache[ck];addCtx.loading=false;addCtx.err=null;if($('addRes'))$('addRes').innerHTML=addResultsHtml();return}
+  addCtx.loading=true;addCtx.err=null;if($('addRes'))$('addRes').innerHTML=addResultsHtml();
+  const F='code,product_name,product_name_en,generic_name,brands,nutriments,serving_quantity,quantity,countries_tags';
+  const SA='https://search.openfoodfacts.org/search?fields='+F+'&q=';
+  let raw=[],ok=false;
+  const res=await Promise.allSettled([
+    fetchJSON(SA+encodeURIComponent(q+' countries_tags:"en:united-kingdom"')+'&page_size=100',8000),
+    fetchJSON(SA+encodeURIComponent(q)+'&page_size=60',8000)]);
+  res.forEach(r=>{if(r.status==='fulfilled'&&r.value&&Array.isArray(r.value.hits)){ok=true;raw.push(...r.value.hits)}});
   if(seq!==searchSeq)return;
-  const seen=new Set();addCtx.online=(prods||[]).map(parseOFF).filter(f=>f&&f.per100.kcal>0&&f.name!=='Unnamed product'&&!seen.has(f.id)&&seen.add(f.id)).slice(0,12);addCtx.online.forEach(f=>TEMP[f.id]=f);
-  if(!prods&&failed)addCtx.err='Shop search unavailable right now (no signal, or the food database is busy). Everyday foods above still work.';
+  if(!ok){try{const j=await fetchJSON(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=50&fields=${F}`,15000);raw=j.products||[];ok=true}catch(e){}}
+  if(seq!==searchSeq)return;
+  let list=[];try{list=offRank(q,raw.map(p=>{try{return parseOFF(p)}catch(e){return null}}))}catch(e){list=[]}
+  addCtx.online=list.slice(0,20);addCtx.online.forEach(f=>TEMP[f.id]=f);if(ok)offCache[ck]=addCtx.online;
+  if(!ok)addCtx.err='Shop search unavailable right now (no signal, or the food database is busy). Everyday foods above still work.';
   addCtx.loading=false;if($('addRes'))$('addRes').innerHTML=addResultsHtml()}
 function parseOFF(p){
-  if(!p)return null;const n=p.nutriments||{};const g=k=>{const v=n[k+'_100g'];return v==null||v===''?null:parseFloat(v)};
+  if(!p)return null;const n=p.nutriments||{};const g=k=>{const v=n[k+'_100g'];return v==null||v===''||isNaN(parseFloat(v))?null:parseFloat(v)};
   let kcal=g('energy-kcal');if(kcal==null){const kj=g('energy-kj')??g('energy');if(kj!=null)kcal=kj/4.184}
   const P=g('proteins')||0,C=g('carbohydrates')||0,F=g('fat')||0;if(kcal==null&&(P||C||F))kcal=P*4+C*4+F*9;
-  const code=p.code||'';const name=(p.product_name||p.product_name_en||'').trim()||'Unnamed product';
-  const sq=parseFloat(p.serving_quantity);const isMl=/ml|cl|\bl\b|litre/i.test(p.quantity||'')&&/drink|milk|juice|water|cola|beer|shake/i.test(name);
-  return{id:'off_'+(code||uid()),name,brand:(p.brands||'').split(',')[0].trim(),barcode:code,per100:{kcal:r1(kcal||0),p:r1(P),c:r1(C),f:r1(F),fib:r1(g('fiber')||0),sug:r1(g('sugars')||0),salt:r1(g('salt')||0)},servingG:sq>0?sq:null,unit:isMl?'ml':'g',complete:kcal!=null}}
-function pickFood(id){const f=getFood(id);if(!f)return;if(TEMP[id]&&!S.foods[id]){S.foods[id]=f;delete TEMP[id];save()}openQty(id)}
+  const code=String(p.code||'');const nm=v=>typeof v==='string'?v:(v&&typeof v==='object'?(v.en||Object.values(v)[0]||''):'');
+  const name=(nm(p.product_name)||nm(p.product_name_en)||nm(p.generic_name)).replace(/\s+/g,' ').trim()||'Unnamed product';
+  const qty=Array.isArray(p.quantity)?p.quantity.join(' '):String(p.quantity||'');
+  const sq=parseFloat(p.serving_quantity);const isMl=/\d\s*(ml|cl|l)\b|litre/i.test(qty)&&/drink|milk|juice|water|cola|beer|lager|shake|latte|coffee|tea|smoothie|squash|pop/i.test(name);
+  const filled=['energy-kcal','proteins','carbohydrates','fat','sugars','fiber','salt','saturated-fat'].filter(k=>g(k)!=null).length;
+  const ct=p.countries_tags;const uk=Array.isArray(ct)?ct.includes('en:united-kingdom'):/united-kingdom/.test(String(ct||''));
+  return{id:'off_'+(code||uid()),name,brand:brandStr(p.brands),barcode:code,per100:{kcal:r1(kcal||0),p:r1(P),c:r1(C),f:r1(F),fib:r1(g('fiber')||0),sug:r1(g('sugars')||0),salt:r1(g('salt')||0)},servingG:sq>0&&sq<2000?sq:null,unit:isMl?'ml':'g',complete:kcal!=null,filled,uk}}
+function pickFood(id){const f=getFood(id);if(!f)return;if(TEMP[id]&&!S.foods[id]){delete f.filled;delete f.uk;S.foods[id]=f;delete TEMP[id];save()}openQty(id)}
 
 /* ---- quantity sheet ---- */
 let qtyCtx=null;
