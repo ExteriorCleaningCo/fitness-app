@@ -139,7 +139,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 
 <script>
 /* ================= DATA & STORAGE ================= */
-const KEY='forge_v1';
+const KEY='forge_v1';const APP_VERSION='v3 · 26 Oct';
 const MEALS=[['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snacks','Snacks']];
 function blank(){return{profile:null,plan:{days:3,level:'intermediate'},foods:{},log:{},weights:[],workouts:[],cardio:[],sauna:[],recent:[],favs:[],swaps:{},active:null,ver:1}}
 function load(){let d=null;try{d=JSON.parse(localStorage.getItem(KEY))}catch(e){}return Object.assign(blank(),d||{})}
@@ -486,7 +486,7 @@ function openSettings(){
   <button class="btn block mt" onclick="saveTargets()">Save targets</button></div>
   <div class="card"><h3>Backup</h3><p class="small muted">Everything is stored on this phone. Download a backup now and then, and use it to move to a new phone.</p>
   <div class="row"><button class="btn" onclick="exportData()">⬇ Download backup</button><label class="btn">⬆ Restore backup<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this)"></label></div></div>
-  <div class="card"><h3>Start again</h3><button class="btn danger ghost" onclick="resetAll()">Delete all data</button></div>`)}
+  <div class="card"><h3>App version</h3><p class="small">Forge <b>${APP_VERSION}</b></p></div><div class="card"><h3>Start again</h3><button class="btn danger ghost" onclick="resetAll()">Delete all data</button></div>`)}
 function saveTargets(){const k=parseInt($('cK').value),p=parseInt($('cP').value);if(k&&(k<1200||k>5000))return toast('Calories should be 1200–5000');S.profile.customKcal=k||null;S.profile.customProtein=p||null;save();closeSheet();render();toast('Targets saved')}
 function exportData(){const b=new Blob([JSON.stringify(S)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='forge-backup-'+todayKey()+'.json';document.body.appendChild(a);a.click();a.remove()}
 function importData(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||typeof d!=='object'||!('log' in d))throw 0;if(!confirm('Replace everything on this phone with this backup?'))return;S=Object.assign(blank(),d);save();closeSheet();render();toast('Backup restored')}catch(e){toast("That file isn't a Forge backup")}};r.readAsText(f)}
@@ -588,7 +588,7 @@ function renderAdd(){
   <form onsubmit="event.preventDefault();clearTimeout(searchTimer);onlineSearch();this.querySelector('input').blur()" class="inrow"><input id="addQ" type="search" enterkeyhint="search" placeholder="Search e.g. white coffee, sourdough, Fage" value="${esc(addCtx.q)}" oninput="onSearchInput(this.value)" autocomplete="off" autocorrect="off"><button class="btn" style="flex:none">Search</button></form>
   <div class="chips mt" id="addTabs" style="display:${addCtx.q.trim()?'none':'flex'}">${tabs.map(([k,n])=>`<button class="chip ${addCtx.tab===k?'on':''}" onclick="addCtx.tab='${k}';renderAdd()">${n}</button>`).join('')}</div>
   <div id="addRes" class="mt">${addResultsHtml()}</div>
-  <hr><div class="row"><button class="btn sm ghost" onclick="openCreateFood({})">+ Create a food</button>${addCtx.mode==='log'?`<button class="btn sm ghost" onclick="newRecipe()">+ Build a meal</button>`:''}</div>`)}
+  <hr><div class="row"><button class="btn sm ghost" onclick="openCreateFood({})">+ Create a food</button>${addCtx.mode==='log'?`<button class="btn sm ghost" onclick="newRecipe()">+ Build a meal</button>`:''}</div><p class="xs muted center mt">Forge ${APP_VERSION}</p>`)}
 async function fetchJSON(url,ms){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
 const offCache={};
 function brandStr(b){return(Array.isArray(b)?b.join(','):String(b||'')).split(',')[0].trim()}
@@ -613,13 +613,13 @@ async function onlineSearch(){
   const res=await Promise.allSettled([
     fetchJSON(SA+encodeURIComponent(q+' countries_tags:"en:united-kingdom"')+'&page_size=100',8000),
     fetchJSON(SA+encodeURIComponent(q)+'&page_size=60',8000)]);
-  res.forEach(r=>{if(r.status==='fulfilled'&&r.value&&Array.isArray(r.value.hits)){ok=true;raw.push(...r.value.hits)}});
+  let why='';res.forEach(r=>{if(r.status==='fulfilled'&&r.value&&Array.isArray(r.value.hits)){ok=true;raw.push(...r.value.hits)}else why=r.status==='rejected'?(r.reason&&r.reason.name==='AbortError'?'timed out':String(r.reason&&r.reason.message||r.reason)):'unexpected reply'});
   if(seq!==searchSeq)return;
   if(!ok){try{const j=await fetchJSON(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=50&fields=${F}`,15000);raw=j.products||[];ok=true}catch(e){}}
   if(seq!==searchSeq)return;
   let list=[];try{list=offRank(q,raw.map(p=>{try{return parseOFF(p)}catch(e){return null}}))}catch(e){list=[]}
   addCtx.online=list.slice(0,20);addCtx.online.forEach(f=>TEMP[f.id]=f);if(ok)offCache[ck]=addCtx.online;
-  if(!ok)addCtx.err='Shop search unavailable right now (no signal, or the food database is busy). Everyday foods above still work.';
+  if(!ok)addCtx.err='Shop search unavailable right now (no signal, or the food database is busy). Everyday foods above still work. ['+why+']';
   addCtx.loading=false;if($('addRes'))$('addRes').innerHTML=addResultsHtml()}
 function parseOFF(p){
   if(!p)return null;const n=p.nutriments||{};const g=k=>{const v=n[k+'_100g'];return v==null||v===''||isNaN(parseFloat(v))?null:parseFloat(v)};
