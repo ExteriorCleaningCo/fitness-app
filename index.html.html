@@ -59,6 +59,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);margin:12px 0 5px}
 .macro{margin:8px 0}
 .macro .between{font-size:13px;margin-bottom:4px}
 .frow{display:block;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--text);margin-bottom:6px;cursor:pointer;font-size:15px}
+.fr-in{display:flex;gap:10px;align-items:center}.fr-tx{flex:1;min-width:0}.fthumb{width:48px;height:48px;object-fit:contain;border-radius:8px;background:#fff;flex:none}
 .frow .fs{font-size:12.5px;color:var(--mute);margin-top:2px}
 .frow-wrap{display:flex;gap:6px;align-items:stretch}.frow-wrap .frow{flex:1}
 .frow-wrap .iconbtn{height:auto;align-self:stretch;margin-bottom:6px}
@@ -139,11 +140,13 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 
 <script>
 /* ================= DATA & STORAGE ================= */
-const KEY='forge_v1';const APP_VERSION='v3 · 26 Oct';
+const KEY='forge_v1';const APP_VERSION='v4 · 27 Oct';
 const MEALS=[['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snacks','Snacks']];
-function blank(){return{profile:null,plan:{days:3,level:'intermediate'},foods:{},log:{},weights:[],workouts:[],cardio:[],sauna:[],recent:[],favs:[],swaps:{},active:null,ver:1}}
+function blank(){return{profile:null,plan:{days:3,level:'intermediate'},foods:{},log:{},weights:[],workouts:[],cardio:[],sauna:[],recent:[],favs:[],swaps:{},active:null,templates:[],customEx:{},ver:1}}
 function load(){let d=null;try{d=JSON.parse(localStorage.getItem(KEY))}catch(e){}return Object.assign(blank(),d||{})}
 let S=load();
+if(!S.templates)S.templates=[];if(!S.customEx)S.customEx={};
+if(!S.seededLF){S.templates.unshift({id:'lfupper',name:'Upper Body – Machines',ex:[{id:'lf_chest_press',sets:3,reps:'10-12',rest:90},{id:'lf_shoulder_press',sets:3,reps:'10-12',rest:90},{id:'lf_pec_fly',sets:3,reps:'12-15',rest:60},{id:'lf_rear_delt',sets:3,reps:'12-15',rest:60}]});S.seededLF=true;try{localStorage.setItem('forge_v1',JSON.stringify(S))}catch(e){}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Could not save – phone storage full?')}}
 const $=id=>document.getElementById(id);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -542,7 +545,8 @@ function copyMeal(m){const src=peekDay(keyAdd(viewDate,-1)).meals[m]||[];day(vie
 /* ---- add food sheet ---- */
 let addCtx={meal:'breakfast',date:null,tab:'recent',q:'',online:null,mode:'log',loading:false};
 function openAdd(meal,mode){addCtx.meal=meal||addCtx.meal||defaultMeal();addCtx.date=tab==='food'?viewDate:todayKey();addCtx.mode=mode||'log';addCtx.q='';addCtx.online=null;if(!['recent','favs','mine','meals','common'].includes(addCtx.tab))addCtx.tab='recent';renderAdd()}
-function foodRow(f,extra){const n=f.per100||{};return`<div class="frow-wrap"><button class="frow" onclick="pickFood('${f.id}')"><div>${f.recipe?'🥘 ':''}${esc(f.name)}</div><div class="fs">${f.brand?esc(f.brand)+' · ':''}${r0(n.kcal)} kcal · ${fm(n.p||0)}g P per 100${f.unit||'g'}${f.servingG?` · 1 ${esc(f.servingName||'serving')} = ${fm(f.servingG)}${f.unit||'g'}`:''}</div></button>${extra||''}</div>`}
+function foodRow(f,extra){const n=f.per100||{},u=f.unit||'g';const sv=f.servingG?`<div class="fs"><b style="color:var(--text)">1 ${esc(f.servingName||'serving')} (${fm(f.servingG)}${u}) = ${r0(n.kcal*f.servingG/100)} kcal</b> · ${fm((n.p||0)*f.servingG/100)}g protein</div>`:'';
+  return`<div class="frow-wrap"><button class="frow" onclick="pickFood('${f.id}')"><div class="fr-in">${f.img?`<img class="fthumb" src="${esc(f.img)}" alt="" loading="lazy" onerror="this.remove()">`:''}<div class="fr-tx"><div>${f.recipe?'🥘 ':''}${esc(f.name)}</div><div class="fs">${f.brand&&f.brand!=='Generic'?esc(f.brand)+' · ':''}${r0(n.kcal)} kcal · ${fm(n.p||0)}g P per 100${u}</div>${sv}</div></div></button>${extra||''}</div>`}
 function listFor(tabName){
   const mine=Object.values(S.foods);
   if(tabName==='recent')return S.recent.map(getFood).filter(Boolean);
@@ -607,7 +611,7 @@ async function onlineSearch(){
   const q=addCtx.q.trim();if(q.length<2)return;const seq=++searchSeq;const ck=norm(q);
   if(offCache[ck]){addCtx.online=offCache[ck];addCtx.loading=false;addCtx.err=null;if($('addRes'))$('addRes').innerHTML=addResultsHtml();return}
   addCtx.loading=true;addCtx.err=null;if($('addRes'))$('addRes').innerHTML=addResultsHtml();
-  const F='code,product_name,product_name_en,generic_name,brands,nutriments,serving_quantity,quantity,countries_tags';
+  const F='code,product_name,product_name_en,generic_name,brands,nutriments,serving_quantity,quantity,countries_tags,image_front_thumb_url,image_front_small_url';
   const SA='https://search.openfoodfacts.org/search?fields='+F+'&q=';
   let raw=[],ok=false;
   const res=await Promise.allSettled([
@@ -631,7 +635,7 @@ function parseOFF(p){
   const sq=parseFloat(p.serving_quantity);const isMl=/\d\s*(ml|cl|l)\b|litre/i.test(qty)&&/drink|milk|juice|water|cola|beer|lager|shake|latte|coffee|tea|smoothie|squash|pop/i.test(name);
   const filled=['energy-kcal','proteins','carbohydrates','fat','sugars','fiber','salt','saturated-fat'].filter(k=>g(k)!=null).length;
   const ct=p.countries_tags;const uk=Array.isArray(ct)?ct.includes('en:united-kingdom'):/united-kingdom/.test(String(ct||''));
-  return{id:'off_'+(code||uid()),name,brand:brandStr(p.brands),barcode:code,per100:{kcal:r1(kcal||0),p:r1(P),c:r1(C),f:r1(F),fib:r1(g('fiber')||0),sug:r1(g('sugars')||0),salt:r1(g('salt')||0)},servingG:sq>0&&sq<2000?sq:null,unit:isMl?'ml':'g',complete:kcal!=null,filled,uk}}
+  return{id:'off_'+(code||uid()),name,brand:brandStr(p.brands),barcode:code,per100:{kcal:r1(kcal||0),p:r1(P),c:r1(C),f:r1(F),fib:r1(g('fiber')||0),sug:r1(g('sugars')||0),salt:r1(g('salt')||0)},servingG:sq>0&&sq<2000?sq:null,unit:isMl?'ml':'g',complete:kcal!=null,filled,uk,img:(typeof p.image_front_thumb_url==='string'&&p.image_front_thumb_url)||(typeof p.image_front_small_url==='string'&&p.image_front_small_url)||''}}
 function pickFood(id){const f=getFood(id);if(!f)return;if(TEMP[id]&&!S.foods[id]){delete f.filled;delete f.uk;S.foods[id]=f;delete TEMP[id];save()}openQty(id)}
 
 /* ---- quantity sheet ---- */
@@ -646,7 +650,7 @@ function renderQty(){
   const sn=f.servingName||'serving';const chips=[...(sg?[[sg/2,'½ '+sn],[sg,'1 '+sn],[sg*2,'2 × '+sn]]:[]),[50,'50'+u],[100,'100'+u],[150,'150'+u],[200,'200'+u],[250,'250'+u]];
   const back=qtyCtx.edit?'':qtyCtx.mode==='recipe'?'openAdd(null,\'recipe\')':'renderAdd()';
   openSheet(sheetHead(qtyCtx.edit?'Edit entry':'How much?',back)+`
-  <div class="between"><div><b style="font-size:17px">${f.recipe?'🥘 ':''}${esc(f.name)}</b><div class="small muted">${f.brand?esc(f.brand)+' · ':''}${r0(f.per100.kcal)} kcal · ${fm(f.per100.p||0)}g P per 100${u}</div>${f.complete===false?'<div class="xs warn">Calories missing on this product – check the label</div>':''}</div>${qtyCtx.fid?`<button class="iconbtn" onclick="toggleFav()" aria-label="Favourite" style="color:${fav?'var(--warn)':'var(--mute)'}">${fav?'★':'☆'}</button>`:''}</div>
+  <div class="between"><div class="fr-in" style="flex:1;min-width:0">${f.img?`<img class="fthumb" style="width:64px;height:64px" src="${esc(String(f.img).replace('.100.jpg','.200.jpg'))}" alt="" onerror="this.remove()">`:''}<div class="fr-tx"><b style="font-size:17px">${f.recipe?'🥘 ':''}${esc(f.name)}</b><div class="small muted">${f.brand?esc(f.brand)+' · ':''}${r0(f.per100.kcal)} kcal · ${fm(f.per100.p||0)}g P per 100${u}</div>${f.complete===false?'<div class="xs warn">Calories missing on this product – check the label</div>':''}</div></div>${qtyCtx.fid?`<button class="iconbtn" onclick="toggleFav()" aria-label="Favourite" style="color:${fav?'var(--warn)':'var(--mute)'}">${fav?'★':'☆'}</button>`:''}</div>
   <div class="inrow mt"><div><label class="f">Amount (${u})</label><input id="qG" type="number" inputmode="decimal" value="${r1(qtyCtx.g)}" oninput="qtyCtx.g=parseFloat(this.value)||0;syncQty('g')"></div>
   ${sg?`<div><label class="f">How many (1 ${esc(f.servingName||'serving')} = ${fm(sg)}${u})</label><input id="qS" type="number" inputmode="decimal" step="0.25" value="${r1(qtyCtx.g/sg)}" oninput="qtyCtx.g=(parseFloat(this.value)||0)*${sg};syncQty('s')"></div>`:''}</div>
   <div class="chips mt">${chips.map(([g,l])=>`<button class="chip" onclick="qtyCtx.g=${g};syncQty()">${l}</button>`).join('')}</div>
@@ -756,7 +760,7 @@ async function lookupBarcode(code){
   addCtx.mode=scanMode;
   const local=Object.values(S.foods).find(f=>f.barcode===code);if(local)return openQty(local.id);
   openSheet(sheetHead('Looking up…')+`<p class="muted">Checking barcode ${esc(code)}…</p>`);
-  try{const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=code,product_name,product_name_en,brands,nutriments,serving_quantity,quantity`);const j=await r.json();
+  try{const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=code,product_name,product_name_en,brands,nutriments,serving_quantity,quantity,image_front_thumb_url,image_front_small_url`);const j=await r.json();
     if(j.status===1&&j.product){const f=parseOFF({...j.product,code});if(f.per100.kcal>0||f.per100.p>0){S.foods[f.id]=f;save();return openQty(f.id)}
       return openCreateFood({barcode:code,name:f.name,brand:f.brand})}
     openCreateFood({barcode:code})}
@@ -795,8 +799,17 @@ triceps:{n:'Cable Triceps Pushdown',eq:'Cable',m:'Triceps',inc:2.5,alt:['oh_ext'
 oh_ext:{n:'Overhead Triceps Extension',eq:'Dumbbell / Cable',m:'Triceps',inc:1,alt:['triceps'],cues:['Hold one dumbbell overhead with both hands','Lower behind your head, elbows pointing up','Extend fully']},
 plank:{n:'Plank',eq:'Bodyweight',m:'Core',inc:0,bw:true,alt:['dead_bug'],cues:['Forearms under shoulders','Squeeze glutes and brace – straight line head to heels','Breathe – don\'t hold your breath','Log seconds in the reps box']},
 dead_bug:{n:'Dead Bug',eq:'Bodyweight',m:'Core',inc:0,bw:true,alt:['plank'],cues:['Lie on back, arms up, knees at 90°','Press lower back into the floor','Extend opposite arm and leg slowly, alternate – reps per side']},
-cable_crunch:{n:'Cable Crunch',eq:'Cable',m:'Abs',inc:2.5,alt:['plank'],cues:['Kneel facing the stack, rope by your head','Curl your ribs towards your hips','Hips stay still – it\'s a crunch, not a bow']}
+cable_crunch:{n:'Cable Crunch',eq:'Cable',m:'Abs',inc:2.5,alt:['plank'],cues:['Kneel facing the stack, rope by your head','Curl your ribs towards your hips','Hips stay still – it\'s a crunch, not a bow']},
+lf_chest_press:{n:'Chest Press (Life Fitness)',eq:'Machine',m:'Chest, front shoulders, triceps',inc:5,gym:true,alt:['lf_pec_fly','db_bench','chest_press'],cues:['Set the seat so the handles line up with the middle of your chest','Sit back with your shoulder blades squeezed together against the pad, feet flat','Press out smoothly until your arms are almost straight – don\'t lock the elbows','Come back slowly over 2–3 seconds and stop just before the plates touch, so the chest stays working','Use the rep counter on the machine\'s display to keep count']},
+lf_shoulder_press:{n:'Shoulder Press (Life Fitness)',eq:'Machine',m:'Shoulders, triceps',inc:5,gym:true,alt:['ohp','lf_rear_delt'],cues:['Set the seat so the handles start just above shoulder height','Back and head against the pad, core braced – don\'t arch your lower back','Press up until your arms are nearly straight','Lower under control until your hands are back at about ear level']},
+lf_pec_fly:{n:'Pectoral Fly (Life Fitness)',eq:'Machine',m:'Chest',inc:5,gym:true,alt:['lf_chest_press','pec_deck'],cues:['Set the seat so your elbows sit just below shoulder height','Set the start position so you feel a stretch across your chest, not a pull in the front of the shoulder','Keep a slight bend in the elbows and bring the handles together in a wide hugging arc','Squeeze your chest for a second in the middle, then open slowly over 2–3 seconds']},
+lf_rear_delt:{n:'Rear Deltoid (Life Fitness)',eq:'Machine',m:'Rear shoulders, upper back',inc:5,gym:true,alt:['face_pull','lf_shoulder_press'],cues:['Sit facing the machine with your chest against the pad','Set the seat so the handles are at shoulder height, arms straight out in front','Slight bend in the elbows – sweep your arms out and back in a wide arc until they\'re in line with your body','Lead with your elbows, don\'t shrug, and return slowly. Go lighter than you think – it\'s a small muscle']}
 };
+const GROUPS=[['gym','★ My gym'],['chest','Chest'],['back','Back'],['shoulders','Shoulders'],['legs','Legs'],['arms','Arms'],['core','Core']];
+const GRP={chest:'bench db_bench incline_db chest_press pec_deck lf_chest_press lf_pec_fly',back:'lat_pulldown assisted_pullup seated_row db_row deadlift',shoulders:'ohp shoulder_machine lat_raise face_pull lf_shoulder_press lf_rear_delt',legs:'bb_squat goblet_squat leg_press rdl db_rdl hip_thrust leg_curl leg_ext split_squat lunge calf',arms:'curl hammer triceps oh_ext',core:'plank dead_bug cable_crunch'};
+Object.entries(GRP).forEach(([g,ids])=>ids.split(' ').forEach(id=>{if(LIB[id])LIB[id].grp=g}));
+[['chest_press','lf_chest_press'],['db_bench','lf_chest_press'],['bench','lf_chest_press'],['pec_deck','lf_pec_fly'],['incline_db','lf_pec_fly'],['ohp','lf_shoulder_press'],['shoulder_machine','lf_shoulder_press'],['face_pull','lf_rear_delt'],['lat_raise','lf_rear_delt']].forEach(([a,b])=>{if(!LIB[a].alt.includes(b))LIB[a].alt.unshift(b)});
+function syncCustomEx(){Object.values(S.customEx||{}).forEach(e=>{LIB[e.id]={...e,alt:e.alt||[],cues:e.cues&&e.cues.length?e.cues:['Set the seat/pads so the movement feels natural','Control the weight both ways – about 2 seconds down','Stop 1–2 reps before your form breaks']}})}
 const FIN={
 intervals:{name:'Treadmill intervals',mins:15,detail:'3 min brisk walk/jog warm-up → 6 rounds of 45 sec fast run (hard but controlled, 8/10 effort) + 75 sec walk → 2 min easy walk. Add a round each week up to 10.'},
 easy:{name:'Easy run',mins:20,detail:'Steady run at chatty pace (you could talk in sentences, 4/10 effort). If 20 min non-stop is too much, do 3 min run / 1 min walk repeats.'},
@@ -850,6 +863,9 @@ function renderTrain(){
   return`<h2>Train</h2>
   <div class="grid3" style="margin-bottom:12px"><div class="stat"><div class="v">${ws}/${P.days}</div><div class="l">Gym this week</div></div><div class="stat"><div class="v">${r1(km)}</div><div class="l">km run</div></div><div class="stat"><div class="v">${sau}</div><div class="l">Sauna mins</div></div></div>
   <div class="card hero"><div class="xs muted">UP NEXT</div><div class="between"><div><b style="font-size:18px">${esc(days[ni].name)}</b><div class="small muted">${esc(days[ni].focus)} · ${days[ni].ex.length} exercises · ~${estMins(days[ni])} min</div><div class="small acc">+ ${days[ni].fin.name} ${days[ni].fin.mins} min · then sauna</div></div><button class="btn pri" onclick="startWorkout(${ni})">Start</button></div></div>
+  <div class="card"><div class="between"><h3 class="mb0">My workouts</h3><button class="btn sm pri" onclick="newTemplate()">+ Create</button></div>
+  <p class="small muted">Your own sessions built from your gym's machines. Start one any time – it doesn't change your plan rotation.</p>
+  ${S.templates.map(t=>`<div class="frow-wrap"><button class="frow" onclick="startTemplate('${t.id}')"><div class="between"><b>${esc(t.name)}</b><span class="tag" style="color:var(--acc)">Start ›</span></div><div class="fs">${t.ex.filter(e=>LIB[e.id]).map(e=>esc(LIB[e.id].n)).join(' · ')||'No exercises yet'}</div></button><button class="iconbtn" onclick="editTemplate('${t.id}')" aria-label="Edit">✎</button></div>`).join('')||'<p class="small muted">None yet.</p>'}</div>
   <div class="card"><h3>Your ${P.days}-day plan</h3><p class="small muted">Rotate through these in order – whatever day of the week it is. Rest at least one day between back-to-back heavy leg days.</p>
   ${days.map((d,i)=>`<button class="frow" onclick="viewDay(${i})"><div class="between"><b>${esc(d.name)}${i===ni?' <span class="tag" style="color:var(--acc)">next</span>':''}</b><span class="xs muted">~${estMins(d)+d.fin.mins} min</span></div><div class="fs">${d.ex.map(e=>LIB[e.id].n).join(' · ')}</div></button>`).join('')}
   <label class="f">Days a week</label><div class="chips">${[3,4,5].map(n=>`<button class="chip ${P.days===n?'on':''}" onclick="S.plan.days=${n};save();render()">${n} days</button>`).join('')}</div>
@@ -872,6 +888,55 @@ function viewDay(i){const d=planDays()[i];
   <h4>4. Cool-down & sauna</h4><div class="exc"><ul class="cues"><li>3–5 min stretching: hamstrings, quads, chest, hips</li><li>Sauna 10–15 min (20 max). Drink 500ml of water before and after</li><li>Get out straight away if you feel dizzy or sick. Skip it after alcohol</li><li>The weight you lose in the sauna is water, not fat – it comes back when you drink</li></ul></div>
   <button class="btn pri block mt" onclick="closeSheet();startWorkout(${i})">Start this workout</button>`)}
 
+/* ---- my workouts (templates) ---- */
+let tplDraft=null,pickCtx={mode:'tpl',i:0,grp:'gym',q:''};
+function newTemplate(){tplDraft={id:null,name:'',ex:[]};openTemplate()}
+function editTemplate(id){const t=S.templates.find(x=>x.id===id);if(!t)return;tplDraft=JSON.parse(JSON.stringify(t));openTemplate()}
+function syncTpl(){if(!tplDraft||!$('tN'))return;tplDraft.name=$('tN').value;tplDraft.ex.forEach((e,i)=>{const a=$('tS'+i),b=$('tR'+i),c=$('tT'+i);if(a)e.sets=Math.max(1,parseInt(a.value)||3);if(b)e.reps=(b.value||'10-12').replace(/\s/g,'');if(c)e.rest=parseInt(c.value)||90})}
+function moveTpl(i,d){syncTpl();const a=tplDraft.ex,j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];openTemplate()}
+function openTemplate(){const T=tplDraft;
+  openSheet(sheetHead(T.id?'Edit workout':'Create a workout')+`
+  <label class="f">Workout name</label><input id="tN" value="${esc(T.name)}" placeholder="e.g. Upper Body – Machines">
+  <h4>Exercises</h4>
+  ${T.ex.map((e,i)=>{const L=LIB[e.id]||{n:e.id,eq:''};return`<div class="exc"><div class="between"><div class="t">${i+1}. ${esc(L.n)}</div><div class="row"><button class="btn sm ghost" onclick="moveTpl(${i},-1)" aria-label="Move up">↑</button><button class="btn sm ghost" onclick="moveTpl(${i},1)" aria-label="Move down">↓</button><button class="btn sm ghost danger" onclick="syncTpl();tplDraft.ex.splice(${i},1);openTemplate()" aria-label="Remove">✕</button></div></div>
+    <div class="grid3 mt"><div><label class="f" style="margin-top:0">Sets</label><input id="tS${i}" type="number" inputmode="numeric" value="${e.sets}"></div><div><label class="f" style="margin-top:0">Reps</label><input id="tR${i}" value="${esc(e.reps)}" placeholder="10-12"></div><div><label class="f" style="margin-top:0">Rest</label><select id="tT${i}">${[45,60,75,90,120,150,180].map(r=>`<option value="${r}" ${+e.rest===r?'selected':''}>${r>=120?r/60+' min':r+'s'}</option>`).join('')}</select></div></div></div>`}).join('')||'<p class="small muted">No exercises yet – add your machines below.</p>'}
+  <button class="btn block" onclick="syncTpl();openPicker('tpl')">+ Add exercise</button>
+  <p class="xs muted">Reps can be a range like 10-12 (the app tells you to add weight when you hit the top on every set) or seconds like 30-45s.</p>
+  <button class="btn pri block mt" onclick="saveTemplate()">Save workout</button>
+  ${T.id?`<button class="btn danger ghost block mt" onclick="deleteTemplate()">Delete workout</button>`:''}`)}
+function saveTemplate(){syncTpl();const T=tplDraft;if(!T.name.trim())return toast('Give the workout a name');if(!T.ex.length)return toast('Add at least one exercise');
+  T.ex.forEach(e=>{if(!/^\d+(-\d+)?s?$/.test(e.reps))e.reps='10-12'});
+  if(T.id){const i=S.templates.findIndex(x=>x.id===T.id);S.templates[i]={...T,name:T.name.trim()}}else S.templates.push({...T,id:uid(),name:T.name.trim()});
+  tplDraft=null;save();closeSheet();render();toast('Workout saved')}
+function deleteTemplate(){if(!confirm('Delete this workout? Your logged history is kept.'))return;S.templates=S.templates.filter(x=>x.id!==tplDraft.id);tplDraft=null;save();closeSheet();render()}
+function startTemplate(id){const t=S.templates.find(x=>x.id===id);if(!t)return;if(!t.ex.some(e=>LIB[e.id]))return editTemplate(id);if(S.active&&!confirm('Replace the workout already in progress?'))return;
+  S.active={dayId:'T:'+t.id,name:t.name,start:Date.now(),fin:null,finDone:false,notes:'',ex:t.ex.map((e,i)=>LIB[e.id]?exState({...e,slot:'T:'+t.id+':'+i}):null).filter(Boolean)};save();closeSheet();tab='train';render();window.scrollTo(0,0)}
+function exList(){const q=norm(pickCtx.q);let l=Object.entries(LIB).map(([id,L])=>({id,...L}));
+  if(q){const qw=q.split(' ');l=l.filter(L=>{const hay=norm(L.n+' '+L.m+' '+L.eq).split(' ');return qw.every(w=>hay.some(x=>wordScore(w,x)>0))})}
+  else if(pickCtx.grp==='gym')l=l.filter(L=>L.gym||L.custom);else l=l.filter(L=>L.grp===pickCtx.grp);
+  return l.sort((a,b)=>(b.gym||b.custom?1:0)-(a.gym||a.custom?1:0)||a.n.localeCompare(b.n))}
+function pickerResults(){const l=exList();return(l.map(L=>`<button class="frow" onclick="pickEx('${L.id}')"><b>${L.gym||L.custom?'★ ':''}${esc(L.n)}</b><div class="fs">${esc(L.eq)} · ${esc(L.m)}</div></button>`).join('')||'<p class="small muted">Nothing here yet.</p>')}
+function openPicker(mode,i,keep){pickCtx.mode=mode;pickCtx.i=i||0;pickCtx.q='';if(!keep)pickCtx.grp='gym';
+  const back=mode==='tpl'?'openTemplate()':mode==='swap'?`swapEx(${pickCtx.i})`:'';
+  openSheet(sheetHead('Choose exercise',back)+`
+  <input id="pQ" type="search" placeholder="Search e.g. chest press, rear delt" oninput="pickCtx.q=this.value;$('pRes').innerHTML=pickerResults();$('pG').style.display=this.value.trim()?'none':'flex'" autocomplete="off">
+  <div class="chips mt" id="pG">${GROUPS.map(([g,n])=>`<button class="chip ${pickCtx.grp===g?'on':''}" onclick="pickCtx.grp='${g}';openPicker(pickCtx.mode,pickCtx.i,true)">${n}</button>`).join('')}</div>
+  <div id="pRes" class="mt">${pickerResults()}</div>
+  <hr><button class="btn ghost block" onclick="openCustomEx()">+ Add a machine or exercise that isn't listed</button>`)}
+function pickEx(id){const m=pickCtx.mode;
+  if(m==='tpl'){tplDraft.ex.push({id,sets:3,reps:LIB[id].bw?'30-45s':'10-12',rest:LIB[id].gym||LIB[id].eq==='Machine'?75:90});openTemplate()}
+  else if(m==='swap'){doSwap(pickCtx.i,id)}
+  else if(m==='live'){S.active.ex.push(exState({id,sets:3,reps:LIB[id].bw?'30-45s':'10-12',rest:90,slot:null}));save();closeSheet();render();setTimeout(()=>window.scrollTo(0,document.body.scrollHeight),50)}}
+function openCustomEx(){const grp=GROUPS.filter(g=>g[0]!=='gym');
+  openSheet(sheetHead('Add a machine',"openPicker(pickCtx.mode,pickCtx.i,true)")+`<p class="small muted">Type the name off the machine's sticker. It'll be saved under ★ My gym.</p>
+  <label class="f">Name</label><input id="cxN" placeholder="e.g. Seated Row (Life Fitness)">
+  <div class="inrow"><div><label class="f">Body part</label><select id="cxG">${grp.map(([g,n])=>`<option value="${g}">${n}</option>`).join('')}</select></div><div><label class="f">Type</label><select id="cxE"><option>Machine</option><option>Cable</option><option>Dumbbells</option><option>Barbell</option><option>Bodyweight</option></select></div></div>
+  <label class="f">Muscles worked (optional)</label><input id="cxM" placeholder="e.g. Back, biceps">
+  <label class="f">Your own tips (optional, one per line)</label><textarea id="cxC" rows="3" placeholder="e.g. Seat on notch 4"></textarea>
+  <button class="btn pri block mt" onclick="saveCustomEx()">Save & add</button>`)}
+function saveCustomEx(){const n=$('cxN').value.trim();if(!n)return toast('Give it a name');const g=$('cxG').value,eq=$('cxE').value;const id='cx_'+uid();
+  S.customEx[id]={id,n,eq,m:$('cxM').value.trim()||(GROUPS.find(x=>x[0]===g)||[0,''])[1],grp:g,inc:eq==='Dumbbells'?2:eq==='Bodyweight'?0:5,bw:eq==='Bodyweight',custom:true,gym:true,alt:[],cues:$('cxC').value.split('\n').map(x=>x.trim()).filter(Boolean)};
+  save();syncCustomEx();pickEx(id)}
 /* ---- live workout ---- */
 function startWorkout(i){if(S.active&&!confirm('Replace the workout already in progress?'))return;const d=planDays()[i];
   S.active={dayId:d.id,name:d.name,start:Date.now(),fin:d.fin,finDone:false,notes:'',ex:d.ex.map(e=>exState(e))};save();closeSheet();tab='train';render();window.scrollTo(0,0)}
@@ -881,14 +946,16 @@ function renderLive(){const A=S.active;const mins=Math.floor((Date.now()-A.start
   <div class="prog"><i style="width:${tot?done/tot*100:0}%"></i></div>
   <p class="small muted">Warm up first: 5 min easy jog/bike + 2 light sets of the first exercise. Tick ✓ after each set – the rest timer starts on its own.</p>
   ${A.ex.map((e,i)=>{const L=LIB[e.id],R=parseRange(e.reps),bw=L.bw||R.secs;
-   return`<div class="exc"><div class="between"><div class="t">${i+1}. ${esc(L.n)}</div>${L.alt.length?`<button class="btn sm ghost" onclick="swapEx(${i})">⇄ Swap</button>`:''}</div>
+   return`<div class="exc"><div class="between"><div class="t">${i+1}. ${esc(L.n)}</div><button class="btn sm ghost" onclick="swapEx(${i})">⇄ Swap</button></div>
    <div class="small"><b class="acc">${e.tsets} × ${e.reps}</b> · rest ${e.rest}s · <span class="tag">${L.eq}</span></div>
    <div class="xs muted mt">${e.last?'Last: '+e.last.map(s=>(s.kg?s.kg+'kg×':'')+s.reps).join(', ')+' · ':''}${e.note}</div>
    <details style="background:transparent;border:0;padding:4px 0;margin:0"><summary class="xs" style="color:var(--acc2)">How to do it</summary><ul class="cues">${L.cues.map(c=>`<li>${c}</li>`).join('')}</ul></details>
    <div class="sethead"><span>Set</span><span>${bw?'—':'kg'}</span><span>${R.secs?'secs':'reps'}</span><span>✓</span></div>
    ${e.sets.map((s,j)=>`<div class="setrow"><span class="n">${j+1}</span><input type="number" inputmode="decimal" ${bw?'disabled placeholder="—"':`placeholder="kg"`} data-kg="${i}-${j}" value="${s.kg}" onchange="setVal(${i},${j},'kg',this.value)"><input type="number" inputmode="numeric" placeholder="${s.ph}" value="${s.reps}" onchange="setVal(${i},${j},'reps',this.value)"><button class="check ${s.done?'done':''}" onclick="tickSet(${i},${j})">✓</button></div>`).join('')}
    <div class="row mt"><button class="btn sm ghost" onclick="S.active.ex[${i}].sets.push({...S.active.ex[${i}].sets.slice(-1)[0],done:false,reps:''});save();render()">+ Set</button>${e.sets.length>1?`<button class="btn sm ghost" onclick="S.active.ex[${i}].sets.pop();save();render()">− Set</button>`:''}</div></div>`}).join('')}
-  <div class="exc"><div class="between"><div class="t">Cardio: ${A.fin.name} · ${A.fin.mins} min</div><button class="check ${A.finDone?'done':''}" style="width:48px" onclick="S.active.finDone=!S.active.finDone;save();render()">✓</button></div><p class="small">${A.fin.detail}</p></div>
+  <button class="btn ghost block" style="margin-bottom:10px" onclick="openPicker('live')">+ Add an exercise</button>
+  ${A.fin?`<div class="exc"><div class="between"><div class="t">Cardio: ${A.fin.name} · ${A.fin.mins} min</div><button class="check ${A.finDone?'done':''}" style="width:48px" onclick="S.active.finDone=!S.active.finDone;save();render()">✓</button></div><p class="small">${A.fin.detail}</p></div>`:''}
+  <label class="f">Logging a session you've already done? How long was it (mins)</label><input type="number" inputmode="numeric" placeholder="leave blank to use the timer" value="${A.manualMins||''}" onchange="S.active.manualMins=parseInt(this.value)||null;save()">
   <label class="f">Notes</label><textarea id="wNotes" rows="2" onchange="S.active.notes=this.value;save()" placeholder="How did it feel?">${esc(A.notes)}</textarea>
   <button class="btn pri block mt" onclick="finishWorkout()">Finish & save workout</button>
   <button class="btn ghost danger block mt" onclick="if(confirm('Bin this workout without saving?')){S.active=null;save();render()}">Discard</button>`}
@@ -896,15 +963,15 @@ function setVal(i,j,k,v){const ex=S.active.ex[i];ex.sets[j][k]=v===''?'':parseFl
 function tickSet(i,j){const ex=S.active.ex[i],s=ex.sets[j];s.done=!s.done;if(s.done&&(s.reps===''||s.reps==null))s.reps=+s.ph||0;save();render();if(s.done)startRest(ex.rest)}
 function swapEx(i){const ex=S.active.ex[i];const L=LIB[ex.id];const opts=[ex.id,...L.alt].filter((v,k,a)=>a.indexOf(v)===k&&LIB[v]);
   openSheet(sheetHead('Swap exercise')+`<p class="small muted">Machine busy or something feels wrong? Pick an alternative – Forge remembers your choice for next time.</p>`+
-  opts.map(id=>`<button class="frow" onclick="doSwap(${i},'${id}')"><b>${LIB[id].n}${id===ex.id?' (current)':''}</b><div class="fs">${LIB[id].eq} · ${LIB[id].m}</div></button>`).join(''))}
-function doSwap(i,id){const ex=S.active.ex[i];S.swaps[ex.slot]=id;S.active.ex[i]=exState({id,slot:ex.slot,reps:ex.reps,rest:ex.rest,sets:ex.tsets});save();closeSheet();render()}
+  opts.map(id=>`<button class="frow" onclick="doSwap(${i},'${id}')"><b>${LIB[id].n}${id===ex.id?' (current)':''}</b><div class="fs">${LIB[id].eq} · ${LIB[id].m}</div></button>`).join('')+`<button class="btn ghost block mt" onclick="openPicker('swap',${i})">Choose any other exercise…</button>`)}
+function doSwap(i,id){const ex=S.active.ex[i];if(ex.slot&&ex.slot.startsWith('T:')){const [,tid,k]=ex.slot.split(':');const t=S.templates.find(x=>x.id===tid);if(t&&t.ex[+k])t.ex[+k].id=id}else if(ex.slot)S.swaps[ex.slot]=id;S.active.ex[i]=exState({id,slot:ex.slot,reps:ex.reps,rest:ex.rest,sets:ex.tsets});save();closeSheet();render()}
 function finishWorkout(){const A=S.active;const done=A.ex.reduce((a,e)=>a+e.sets.filter(s=>s.done).length,0);
   if(!done&&!confirm('No sets ticked. Save anyway?'))return;
-  const mins=Math.max(1,Math.round((Date.now()-A.start)/60000));const kg=curWeight();
+  const mins=A.manualMins||Math.max(1,Math.round((Date.now()-A.start)/60000));const kg=curWeight();
   const ex=A.ex.map(e=>({id:e.id,sets:e.sets.filter(s=>s.done).map(s=>({kg:+s.kg||0,reps:+s.reps||0}))})).filter(e=>e.sets.length);
   const prs=[];ex.forEach(e=>{const best=Math.max(...e.sets.map(s=>s.kg));if(!best)return;const prev=S.workouts.flatMap(w=>(w.ex||[]).filter(x=>x.id===e.id).flatMap(x=>x.sets.map(s=>s.kg)));if(prev.length&&best>Math.max(...prev))prs.push(LIB[e.id].n+' '+best+'kg')});
   const vol=ex.reduce((a,e)=>a+e.sets.reduce((b,s)=>b+s.kg*s.reps,0),0);
-  const w={id:uid(),date:todayKey(),dayId:A.dayId,name:A.name,mins,ex,fin:A.finDone,notes:A.notes,kcal:Math.round(5*kg*mins/60)+(A.finDone?Math.round(8*kg*A.fin.mins/60):0)};
+  const w={id:uid(),date:todayKey(),dayId:A.dayId,name:A.name,mins,ex,fin:A.finDone,notes:A.notes,kcal:Math.round(5*kg*mins/60)+(A.fin&&A.finDone?Math.round(8*kg*A.fin.mins/60):0)};
   S.workouts.unshift(w);S.active=null;skipRest();save();render();
   openSheet(sheetHead('Workout saved 💪')+`<div class="grid3"><div class="stat"><div class="v">${mins}</div><div class="l">Minutes</div></div><div class="stat"><div class="v">${done}</div><div class="l">Sets</div></div><div class="stat"><div class="v">${r0(vol)}</div><div class="l">kg lifted</div></div></div>
   ${prs.length?`<div class="tip good mt"><b>New personal bests 🏆</b>${prs.map(esc).join('<br>')}</div>`:''}
@@ -1044,7 +1111,7 @@ function renderCoach(){const t=targets(),p=S.profile;
   <p class="xs muted center">Forge gives general fitness and nutrition guidance, not medical advice. Check with your GP before starting if you have any health conditions.</p>`}
 
 /* ================= BOOT ================= */
-render();
+syncCustomEx();render();
 setInterval(()=>{if(S.active&&tab==='train'&&!$('sheet').classList.contains('open')&&!document.activeElement.matches('input,textarea')){/* keep timer header fresh */const el=document.querySelector('main h2');if(el)render()}},60000);
 </script>
 </body>
